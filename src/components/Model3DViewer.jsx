@@ -10,6 +10,7 @@ import { useRef, useState, useEffect, Suspense } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, Environment, ContactShadows, Float } from "@react-three/drei";
 import * as THREE from "three";
+const { scene } = useGLTF("/model_optimized.glb");
 
 function Model({ modelPath, isHovered, mousePos }) {
   const groupRef = useRef();
