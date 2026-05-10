@@ -7,7 +7,7 @@ import { useRef, useState, useEffect, Suspense, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, Environment, ContactShadows, Float } from "@react-three/drei";
 import * as THREE from "three";
-import modelUrl from "../public/model_optimized.glb";
+import modelUrl from "../model_optimized.glb";
 
 // المكون المسئول عن الموديل نفسه (تم فصله لضمان استقرار الـ Reference)
 function Model({ modelScene, isHovered, mousePos }) {
