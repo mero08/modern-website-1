@@ -1,33 +1,31 @@
 /**
- * Model3DViewer.jsx — v2
- * Added: transparent={true} prop for hero section usage
- *
- * INSTALLATION:
- *   npm install three @react-three/fiber @react-three/drei
+ * Model3DViewer.jsx — v2.1 (Optimized for Production/Vercel)
+ * تم تحسين الكود لضمان استقرار التحميل ومنع خطأ Unexpected end of JSON
  */
 
-import { useRef, useState, useEffect, Suspense } from "react";
+import { useRef, useState, useEffect, Suspense, useMemo } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
 import { useGLTF, Environment, ContactShadows, Float } from "@react-three/drei";
 import * as THREE from "three";
 
-function Model({ modelPath, isHovered, mousePos }) {
+// المكون المسئول عن الموديل نفسه (تم فصله لضمان استقرار الـ Reference)
+function Model({ modelScene, isHovered, mousePos }) {
   const groupRef = useRef();
-  const { scene } = useGLTF(modelPath);
-  const clonedScene = scene.clone(true);
+  
+  // عمل Clone للمشهد لضمان عدم حدوث مشاكل في حال إعادة الرندر
+  const clonedScene = useMemo(() => modelScene.clone(), [modelScene]);
 
   useFrame((state, delta) => {
     if (!groupRef.current) return;
 
-    // ── Auto-rotation on BOTH axes simultaneously (globe effect) ──
-    groupRef.current.rotation.y += delta * 0.4;   // horizontal spin
-    groupRef.current.rotation.x += delta * 0.15;  // vertical tilt — same feel, slower so it doesn't flip
+    // دوران تلقائي مستمر
+    groupRef.current.rotation.y += delta * 0.4;
+    groupRef.current.rotation.x += delta * 0.15;
 
-    // ── Mouse influence — lerp 0.12 = fast & smooth ──
-    const targetX = isHovered ? mousePos.y * 0.4 : groupRef.current.rotation.x;
-    const targetY = isHovered ? mousePos.x * 0.4 : groupRef.current.rotation.y;
-
+    // تأثير حركة الماوس عند الـ Hover
     if (isHovered) {
+      const targetX = mousePos.y * 0.4;
+      const targetY = mousePos.x * 0.4;
       groupRef.current.rotation.x = THREE.MathUtils.lerp(groupRef.current.rotation.x, targetX, 0.12);
       groupRef.current.rotation.y = THREE.MathUtils.lerp(groupRef.current.rotation.y, targetY, 0.12);
     }
@@ -40,6 +38,7 @@ function Model({ modelPath, isHovered, mousePos }) {
   );
 }
 
+// إضاءة المشهد
 function Lighting({ transparent }) {
   return (
     <>
@@ -51,41 +50,38 @@ function Lighting({ transparent }) {
   );
 }
 
-function MaterialEnhancer({ scene }) {
-  useEffect(() => {
-    if (!scene) return;
-    scene.traverse((child) => {
-      if (child.isMesh && child.material) {
-        child.material.metalness = 0.7;
-        child.material.roughness = 0.3;
-        child.material.envMapIntensity = 1.5;
-        child.material.needsUpdate = true;
-        child.castShadow = true;
-        child.receiveShadow = true;
-      }
-    });
-  }, [scene]);
-  return null;
-}
-
+// المكون الداخلي الذي يتعامل مع تحميل الملف
 function SceneContent({ modelPath, isHovered, mousePos, transparent, setIsLoaded, showShadow, floatEffect }) {
-  const { scene: modelScene } = useGLTF(modelPath);
-  useEffect(() => { setIsLoaded(true); }, []);
+  // تحميل الموديل مرة واحدة فقط هنا لمنع تكرار الطلبات للسيرفر
+  const { scene } = useGLTF(modelPath);
 
-  const ModelComponent = (
-    <Model modelPath={modelPath} isHovered={isHovered} mousePos={mousePos} />
-  );
+  useEffect(() => {
+    if (scene) {
+      setIsLoaded(true);
+      scene.traverse((child) => {
+        if (child.isMesh && child.material) {
+          child.material.metalness = 0.7;
+          child.material.roughness = 0.3;
+          child.material.envMapIntensity = 1.5;
+          child.castShadow = true;
+          child.receiveShadow = true;
+        }
+      });
+    }
+  }, [scene, setIsLoaded]);
+
+  const modelElement = <Model modelScene={scene} isHovered={isHovered} mousePos={mousePos} />;
 
   return (
     <>
       <Lighting transparent={transparent} />
-      <MaterialEnhancer scene={modelScene} />
       <Environment preset="city" />
       {floatEffect ? (
         <Float speed={1.5} rotationIntensity={0} floatIntensity={0.4} floatingRange={[-0.05, 0.05]}>
-          {ModelComponent}
+          {modelElement}
         </Float>
-      ) : ModelComponent}
+      ) : modelElement}
+      
       {showShadow && (
         <ContactShadows position={[0, -1.0, 0]} opacity={0.5} scale={3} blur={2.5} far={2} color="#000000" />
       )}
@@ -94,7 +90,7 @@ function SceneContent({ modelPath, isHovered, mousePos, transparent, setIsLoaded
 }
 
 export default function Model3DViewer({
-  modelPath = "/model_optimized.glb",
+  modelPath = "/model_optimized.glb", 
   height = "600px",
   width = "100%",
   backgroundColor = "#0a0a0f",
@@ -127,7 +123,6 @@ export default function Model3DViewer({
         backgroundColor: transparent ? "transparent" : backgroundColor,
         borderRadius: transparent ? "0" : "16px",
         overflow: "hidden",
-        
         filter: isHovered && transparent ? "drop-shadow(0 0 30px hsl(43 100% 75% / 0.25))" : "none",
         transition: "filter 0.4s ease, box-shadow 0.4s ease",
         boxShadow: !transparent
@@ -153,9 +148,6 @@ export default function Model3DViewer({
           toneMapping: THREE.ACESFilmicToneMapping,
           toneMappingExposure: 1.2,
           outputColorSpace: THREE.SRGBColorSpace,
-        }}
-        onCreated={({ gl }) => {
-          if (transparent) gl.setClearColor(0x000000, 0);
         }}
       >
         <Suspense fallback={null}>
@@ -184,3 +176,6 @@ export default function Model3DViewer({
     </div>
   );
 }
+
+// سطر مهم جداً لتحميل الموديل مسبقاً في الـ Cache
+useGLTF.preload("/model_optimized.glb");
